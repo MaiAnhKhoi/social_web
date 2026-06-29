@@ -8,10 +8,12 @@ import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import ms, { StringValue } from 'ms';
 import { JwtStrategy } from './strategy/jwt.strategy';
+import { MailModule } from '@/mail/mail.module';
 
 @Module({
   imports: [
     UsersModule,
+    MailModule,
     PassportModule.register({ session: false }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

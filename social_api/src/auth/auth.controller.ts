@@ -1,10 +1,20 @@
-import { Body, Controller, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { UseGuards } from '@nestjs/common';
 import { LocalAuthGuard } from './guard/local-auth.guard';
 import { AuthService } from './auth.service';
 import { User } from '@/generated/prisma/client';
 import type { Response, Request } from 'express';
 import { RegisterDto } from './dto/register.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { ResendOtpDto } from './dto/resend-otp.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -43,15 +53,18 @@ export class AuthController {
 
   @Post('/register')
   async register(@Body() dto: RegisterDto) {
-    const { username, displayName, email, password } = dto;
-    const user = await this.authService.register({
-      username,
-      displayName,
-      email,
-      password,
-    });
-    return {
-      message: `User ${user.username} registered successfully`,
-    };
+    return this.authService.register(dto);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('/verify-otp')
+  async verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyOtp(dto.email, dto.code);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('/resend-otp')
+  async resendOtp(@Body() dto: ResendOtpDto) {
+    return this.authService.resendOtp(dto.email);
   }
 }
