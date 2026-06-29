@@ -1,14 +1,36 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '@/prisma/prisma.service';
-import { User } from '@/generated/prisma/client';
+import { Prisma, User } from '@/generated/prisma/client';
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
+  async create(createUserDto: CreateUserDto): Promise<User> {
+    const { provider, providerUserId, ...data } = createUserDto;
+    try {
+      return await this.prisma.user.create({
+        data: {
+          ...data,
+          providers:
+            provider && providerUserId
+              ? { create: { provider, providerUserId } }
+              : undefined,
+        },
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        const target = Array.isArray(e.meta?.target)
+          ? (e.meta.target as string[]).join(', ')
+          : 'Thông tin';
+        throw new ConflictException(`${target} đã tồn tại`);
+      }
+      throw e;
+    }
   }
 
   findAll() {

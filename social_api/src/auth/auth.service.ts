@@ -1,12 +1,19 @@
 import { ConfigService } from '@nestjs/config';
 import { comparePassword, hashPassword } from '@/common/utils/password.utils';
 import { UsersService } from '@/users/users.service';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '@/generated/prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import ms, { StringValue } from 'ms';
 import { Response } from 'express';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -52,12 +59,19 @@ export class AuthService {
 
     return { accessToken, refreshToken };
   }
-  async validateUser(username: string, pass: string): Promise<User | null> {
-    const user = await this.usersService.findOneByUserEmail(username);
+
+  async validateUser({ email, password }: LoginDto): Promise<User | null> {
+    const user = await this.usersService.findOneByUserEmail(email);
     if (!user) return null;
     if (!user.passwordHash) return null;
-    const isPasswordValid = await comparePassword(pass, user.passwordHash);
+    const isPasswordValid = await comparePassword(password, user.passwordHash);
     if (!isPasswordValid) return null;
+    if (!user.isActive) {
+      throw new ForbiddenException('Tài khoản đã bị vô hiệu hóa');
+    }
+    if (!user.isVerified) {
+      throw new ForbiddenException('Tài khoản chưa được xác thực');
+    }
     return user;
   }
   async login(user: User) {
@@ -158,5 +172,21 @@ export class AuthService {
       where: { id: matched.id },
       data: { revoked: true },
     });
+  }
+
+  async register(registerDto: RegisterDto) {
+    const { username, displayName, email, password } = registerDto;
+    const existingUser = await this.usersService.findOneByUserEmail(email);
+    if (existingUser) {
+      throw new ConflictException('Email đã được sử dụng');
+    }
+    const hashedPassword = await hashPassword(password);
+    const user = await this.usersService.create({
+      username,
+      displayName,
+      email,
+      passwordHash: hashedPassword,
+    });
+    return user;
   }
 }
